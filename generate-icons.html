@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Extension Icons</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .icon-row { display: flex; align-items: center; gap: 16px; margin: 12px 0; }
+    canvas { border: 1px solid #ccc; }
+    a { color: #4CAF50; }
+  </style>
+</head>
+<body>
+  <h1>Icon Generator — Enable All Buttons</h1>
+  <p>Right-click each icon and "Save image as..." to the <code>icons/</code> folder.</p>
+  <div id="icons"></div>
+
+  <script>
+    const sizes = [16, 48, 128];
+
+    sizes.forEach(size => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Green circle background
+      const radius = size / 2;
+      ctx.fillStyle = '#4CAF50';
+      ctx.beginPath();
+      ctx.arc(radius, radius, radius - 1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // White "B" letter
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.round(size * 0.55)}px Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('B', radius, radius + 1);
+
+      const row = document.createElement('div');
+      row.className = 'icon-row';
+
+      const label = document.createElement('span');
+      label.textContent = `icon${size}.png (${size}x${size})`;
+
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `icon${size}.png`;
+      link.textContent = 'Download';
+
+      row.appendChild(canvas);
+      row.appendChild(label);
+      row.appendChild(link);
+      document.getElementById('icons').appendChild(row);
+    });
+  </script>
+</body>
+</html>

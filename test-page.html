@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enable All Buttons — Test Page</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h2 { margin-top: 32px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+    .row { display: flex; gap: 12px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+    .row label { min-width: 200px; color: #666; font-size: 14px; }
+    button, input, select, textarea { padding: 8px 16px; font-size: 14px; }
+    .pointer-blocked { pointer-events: none; opacity: 0.5; }
+    .cursor-blocked { cursor: not-allowed; }
+    #dynamic-area { margin-top: 12px; padding: 16px; background: #f5f5f5; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Extension Test Page</h1>
+  <p>Load the "Enable All Buttons" extension, then toggle it ON. All disabled elements below should become enabled.</p>
+
+  <h2>1. Disabled Buttons</h2>
+  <div class="row">
+    <label>disabled attribute:</label>
+    <button disabled>Click Me</button>
+  </div>
+  <div class="row">
+    <label>disabled + type=submit:</label>
+    <button type="submit" disabled>Submit</button>
+  </div>
+
+  <h2>2. Disabled Inputs</h2>
+  <div class="row">
+    <label>disabled text input:</label>
+    <input type="text" disabled value="Can't edit this">
+  </div>
+  <div class="row">
+    <label>disabled checkbox:</label>
+    <input type="checkbox" disabled checked>
+  </div>
+  <div class="row">
+    <label>readonly input:</label>
+    <input type="text" readonly value="Read only text">
+  </div>
+
+  <h2>3. Disabled Select & Textarea</h2>
+  <div class="row">
+    <label>disabled select:</label>
+    <select disabled>
+      <option>Option A</option>
+      <option>Option B</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>disabled textarea:</label>
+    <textarea disabled rows="2">Can't type here</textarea>
+  </div>
+
+  <h2>4. ARIA Disabled</h2>
+  <div class="row">
+    <label>aria-disabled button:</label>
+    <button aria-disabled="true">ARIA Disabled</button>
+  </div>
+  <div class="row">
+    <label>aria-disabled link:</label>
+    <a href="#" aria-disabled="true" role="button">Disabled Link</a>
+  </div>
+
+  <h2>5. CSS Disabled (pointer-events: none)</h2>
+  <div class="row">
+    <label>pointer-events: none:</label>
+    <button class="pointer-blocked">Blocked by CSS</button>
+  </div>
+  <div class="row">
+    <label>cursor: not-allowed:</label>
+    <button class="cursor-blocked">Not Allowed Cursor</button>
+  </div>
+
+  <h2>6. Dynamically Added (click to add)</h2>
+  <button id="add-btn" onclick="addDisabledButton()">Add Disabled Button</button>
+  <div id="dynamic-area">Dynamic buttons appear here...</div>
+
+  <h2>7. Framework Re-disable Simulation</h2>
+  <button id="fight-btn">This re-disables every 2s</button>
+
+  <script>
+    let dynamicCount = 0;
+    function addDisabledButton() {
+      dynamicCount++;
+      const btn = document.createElement('button');
+      btn.disabled = true;
+      btn.textContent = `Dynamic Button #${dynamicCount}`;
+      btn.style.margin = '4px';
+      document.getElementById('dynamic-area').appendChild(btn);
+    }
+
+    // Simulate a framework re-disabling a button every 2 seconds
+    setInterval(() => {
+      const btn = document.getElementById('fight-btn');
+      btn.disabled = true;
+    }, 2000);
+  </script>
+</body>
+</html>
