@@ -143,8 +143,14 @@
     // The extension unblocks this by adding a capture-phase dragover listener
     // that calls preventDefault before this handler runs.
     blockedZone.addEventListener('dragover', (e) => {
-      // Intentionally NOT calling e.preventDefault() → browser blocks drop
-      blockedZone.classList.add('over');
+      // Intentionally NOT calling e.preventDefault() → browser blocks drop by default.
+      // Only show hover when the extension's capture-phase listener already called
+      // preventDefault (making e.defaultPrevented === true), meaning drops are allowed.
+      if (e.defaultPrevented) {
+        blockedZone.classList.add('over');
+      } else {
+        blockedZone.classList.remove('over');
+      }
     });
 
     blockedZone.addEventListener('dragleave', () => {

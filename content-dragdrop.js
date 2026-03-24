@@ -23,6 +23,11 @@ if (window.__enableDragDropActive) {
     e.preventDefault();
   }
 
+  // For all other drag events: no-op capture handler.
+  // We register these so cleanup (removeEventListener) works cleanly,
+  // but we don't need to call preventDefault on them.
+  function allowEvent() {}
+
   function enableDraggableAttributes() {
     // Remove draggable="false" from elements
     document.querySelectorAll('[draggable="false"]').forEach(el => {

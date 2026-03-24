@@ -230,7 +230,7 @@ Listens for `countUpdate` messages (note: there's a known bug here — backgroun
 
 | # | File | Issue | Impact |
 |---|---|---|---|
-| 1 | `content-dragdrop.js:57` | `allowEvent` function is referenced but never defined | Drag events other than `dragover`/`drop` will throw a ReferenceError when drag starts |
+| 1 | `content-dragdrop.js:57` | ~~`allowEvent` function was referenced but never defined~~ | **FIXED** — defined as no-op function |
 | 2 | `popup.js:84` | Listens for `countUpdate` with `message.tabId`, but background sends `countUpdate` from content script without a `tabId` field in the forwarded message | Live element count doesn't update in popup after it's opened |
 | 3 | `content-dragdrop.js:34` | `document.querySelectorAll('*')` scans every element on the page for CSS properties — very expensive on large pages | Performance issue on pages with many elements |
 | 4 | `content.js:93-116` | `restoreAll()` only queries `document` — does not restore elements inside shadow DOM | Elements inside shadow roots are not restored when toggling off |
