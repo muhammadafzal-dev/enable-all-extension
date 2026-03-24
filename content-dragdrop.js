@@ -1,58 +1,133 @@
 // content-dragdrop.js — Unblock drag & drop on sites that prevent it
 
 if (window.__enableDragDropActive) {
-  // Already running
+  // Already running — just rescan for any newly blocked elements
+  if (typeof window.__eabDragRescan === 'function') {
+    window.__eabDragRescan();
+  }
 } else {
   window.__enableDragDropActive = true;
 
   const DRAG_EVENTS = ['dragstart', 'drag', 'dragenter', 'dragover', 'dragleave', 'drop', 'dragend'];
-
-  // Store references for cleanup
   const captureHandlers = {};
 
-  // For dragover: must call preventDefault to signal the browser that drops are allowed.
-  // Do NOT stopPropagation — that would kill the target element's own handlers (including
-  // the page's real drop listener that shows files).
+  // ─── Layer 1: Capture-phase event interception ───────────────────────────
+  // These fire BEFORE any site code. The site can remove its own listeners,
+  // set draggable="false", call stopPropagation — none of it matters because
+  // our capture listeners already ran. This is the core guarantee.
+
   function allowDragOver(e) {
+    // Browser only allows a drop if preventDefault is called during dragover.
+    // We do it here in capture phase so it always fires regardless of site state.
     e.preventDefault();
   }
 
-  // For drop: just prevent the browser from navigating to the dropped file.
-  // Let the event propagate normally so the page's own drop handler can process files.
   function allowDrop(e) {
+    // Prevents browser from navigating to the dropped file.
+    // Page's own drop handler still runs after this (we don't stopPropagation).
     e.preventDefault();
   }
 
-  // For all other drag events: no-op capture handler.
-  // We register these so cleanup (removeEventListener) works cleanly,
-  // but we don't need to call preventDefault on them.
+  // No-op for other drag events — registered only so cleanup works cleanly.
   function allowEvent() {}
 
-  function enableDraggableAttributes() {
-    // Remove draggable="false" from elements
-    document.querySelectorAll('[draggable="false"]').forEach(el => {
+  // ─── Layer 2: Fix element attributes and inline styles ───────────────────
+
+  function fixElement(el) {
+    if (!el || el.nodeType !== Node.ELEMENT_NODE) return;
+
+    // Fix draggable="false" attribute
+    if (el.getAttribute('draggable') === 'false') {
       el.setAttribute('draggable', 'true');
       el.dataset.eabWasDraggable = 'false';
-    });
+    }
 
-    // Remove CSS that blocks drag
-    document.querySelectorAll('*').forEach(el => {
-      const style = getComputedStyle(el);
-      if (style.webkitUserDrag === 'none' || style.userSelect === 'none') {
-        if (style.webkitUserDrag === 'none') {
-          el.style.webkitUserDrag = 'auto';
-          el.dataset.eabWasUserDrag = 'true';
-        }
-        if (style.userSelect === 'none') {
-          el.style.userSelect = 'auto';
-          el.dataset.eabWasUserSelect = 'true';
-        }
+    // Fix inline style drag blocking
+    if (el.style.webkitUserDrag === 'none') {
+      el.style.webkitUserDrag = 'auto';
+      el.dataset.eabWasUserDrag = 'true';
+    }
+    if (el.style.userSelect === 'none') {
+      el.style.userSelect = 'auto';
+      el.dataset.eabWasUserSelect = 'true';
+    }
+    if (el.style.pointerEvents === 'none') {
+      el.style.pointerEvents = 'auto';
+      el.dataset.eabWasPointerEvents = 'true';
+    }
+  }
+
+  // Scan full DOM and fix all blocked elements
+  function scanAndFix() {
+    // Fix attribute-based blocking
+    document.querySelectorAll('[draggable="false"]').forEach(fixElement);
+
+    // Fix inline-style-based blocking on any element
+    document.querySelectorAll('[style]').forEach(el => {
+      if (
+        el.style.webkitUserDrag === 'none' ||
+        el.style.userSelect === 'none' ||
+        el.style.pointerEvents === 'none'
+      ) {
+        fixElement(el);
       }
     });
   }
 
+  // Restore everything to original state (called when toggled off)
+  function restoreAll() {
+    document.querySelectorAll('[data-eab-was-draggable]').forEach(el => {
+      el.setAttribute('draggable', el.dataset.eabWasDraggable);
+      delete el.dataset.eabWasDraggable;
+    });
+    document.querySelectorAll('[data-eab-was-user-drag]').forEach(el => {
+      el.style.webkitUserDrag = 'none';
+      delete el.dataset.eabWasUserDrag;
+    });
+    document.querySelectorAll('[data-eab-was-user-select]').forEach(el => {
+      el.style.userSelect = 'none';
+      delete el.dataset.eabWasUserSelect;
+    });
+    document.querySelectorAll('[data-eab-was-pointer-events]').forEach(el => {
+      el.style.pointerEvents = 'none';
+      delete el.dataset.eabWasPointerEvents;
+    });
+  }
+
+  // ─── Layer 3: MutationObserver — re-enable the moment site tries to disable ─
+
+  function handleMutations(mutations) {
+    for (const mutation of mutations) {
+      // New elements added to DOM
+      if (mutation.type === 'childList') {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType !== Node.ELEMENT_NODE) continue;
+          fixElement(node);
+          node.querySelectorAll?.('[draggable="false"]').forEach(fixElement);
+          node.querySelectorAll?.('[style]').forEach(el => {
+            if (
+              el.style.webkitUserDrag === 'none' ||
+              el.style.userSelect === 'none' ||
+              el.style.pointerEvents === 'none'
+            ) {
+              fixElement(el);
+            }
+          });
+        }
+      }
+
+      // Attribute changed on existing element (site trying to re-disable)
+      if (mutation.type === 'attributes') {
+        const el = mutation.target;
+        // Skip if we set this attribute ourselves to avoid infinite loop
+        if (mutation.attributeName === 'draggable' && el.dataset.eabWasDraggable) continue;
+        fixElement(el);
+      }
+    }
+  }
+
   function start() {
-    // Capture-phase listeners to intercept before site's listeners
+    // Layer 1: Capture-phase event listeners
     DRAG_EVENTS.forEach(eventName => {
       if (eventName === 'dragover') {
         captureHandlers[eventName] = allowDragOver;
@@ -64,78 +139,44 @@ if (window.__enableDragDropActive) {
       document.addEventListener(eventName, captureHandlers[eventName], true);
     });
 
-    // Fix draggable attributes
-    enableDraggableAttributes();
+    // Layer 2: Fix all currently blocked elements
+    scanAndFix();
 
-    // Watch for dynamically added elements with draggable="false"
-    window.__eabDragObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType !== Node.ELEMENT_NODE) continue;
-            if (node.getAttribute?.('draggable') === 'false') {
-              node.setAttribute('draggable', 'true');
-              node.dataset.eabWasDraggable = 'false';
-            }
-            node.querySelectorAll?.('[draggable="false"]').forEach(el => {
-              el.setAttribute('draggable', 'true');
-              el.dataset.eabWasDraggable = 'false';
-            });
-          }
-        }
-        if (mutation.type === 'attributes' && mutation.attributeName === 'draggable') {
-          const el = mutation.target;
-          if (el.getAttribute('draggable') === 'false' && !el.dataset.eabWasDraggable) {
-            el.setAttribute('draggable', 'true');
-            el.dataset.eabWasDraggable = 'false';
-          }
-        }
-      }
-    });
-
+    // Layer 3: Watch for the site trying to re-disable anything
+    window.__eabDragObserver = new MutationObserver(handleMutations);
     window.__eabDragObserver.observe(document.documentElement, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['draggable']
+      attributeFilter: ['draggable', 'style']
     });
   }
 
   function stop() {
-    // Remove capture listeners
+    // Remove capture-phase listeners
     DRAG_EVENTS.forEach(eventName => {
       if (captureHandlers[eventName]) {
         document.removeEventListener(eventName, captureHandlers[eventName], true);
       }
     });
 
-    // Restore draggable attributes
-    document.querySelectorAll('[data-eab-was-draggable]').forEach(el => {
-      el.setAttribute('draggable', el.dataset.eabWasDraggable);
-      delete el.dataset.eabWasDraggable;
-    });
-
-    // Restore CSS
-    document.querySelectorAll('[data-eab-was-user-drag]').forEach(el => {
-      el.style.webkitUserDrag = 'none';
-      delete el.dataset.eabWasUserDrag;
-    });
-
-    document.querySelectorAll('[data-eab-was-user-select]').forEach(el => {
-      el.style.userSelect = 'none';
-      delete el.dataset.eabWasUserSelect;
-    });
-
-    // Disconnect observer
+    // Stop watching
     if (window.__eabDragObserver) {
       window.__eabDragObserver.disconnect();
       window.__eabDragObserver = null;
     }
 
+    // Restore original state
+    restoreAll();
     window.__enableDragDropActive = false;
   }
 
-  // Listen for disconnect
+  // Expose rescan for re-injection after page navigation
+  window.__eabDragRescan = () => {
+    scanAndFix();
+  };
+
+  // Listen for toggle-off from background
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'disconnect' && message.feature === 'dragdrop') {
       stop();
