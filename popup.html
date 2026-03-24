@@ -5,16 +5,76 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <h1 class="title">Enable All</h1>
-    <p class="subtitle">Remove disabled state from buttons &amp; inputs</p>
+  <div class="popup">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="#4CAF50"/>
+          <path d="M8 14.5L12 18.5L20 10.5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="logo-text">
+          <h1>Enable All</h1>
+          <span class="version">v1.0</span>
+        </div>
+      </div>
+    </div>
 
-    <label class="toggle">
-      <input type="checkbox" id="toggle">
-      <span class="slider"></span>
-    </label>
+    <!-- Feature Cards -->
+    <div class="cards">
+      <!-- Enable Buttons Card -->
+      <div class="card" id="card-buttons">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="6" width="16" height="8" rx="4" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="card-content">
+          <div class="card-title">Enable Buttons</div>
+          <div class="card-desc" id="status-buttons">Removes disabled, readonly &amp; blocked states</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-buttons">
+          <span class="slider"></span>
+        </label>
+      </div>
 
-    <p id="status" class="status">Inactive</p>
+      <!-- Enable Drag & Drop Card -->
+      <div class="card" id="card-dragdrop">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 3V17M10 3L6 7M10 3L14 7M10 17L6 13M10 17L14 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="card-content">
+          <div class="card-title">Enable Drag & Drop</div>
+          <div class="card-desc" id="status-dragdrop">Unblocks file drag &amp; drop on any site</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-dragdrop">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats" id="stats" style="display: none;">
+      <div class="stat">
+        <span class="stat-value" id="stat-count">0</span>
+        <span class="stat-label">elements fixed</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-dot active"></span>
+        <span class="stat-label">watching page</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Works on current tab only</span>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>

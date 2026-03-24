@@ -116,14 +116,37 @@ if (window.__enableAllButtonsActive) {
     });
   }
 
+  // Check if extension context is still valid
+  function isContextValid() {
+    try {
+      return !!chrome.runtime?.id;
+    } catch {
+      return false;
+    }
+  }
+
+  // Tear down observers when extension is reloaded mid-page
+  function teardownOnInvalidContext() {
+    if (observer) { observer.disconnect(); observer = null; }
+    shadowObservers.forEach(obs => obs.disconnect());
+    shadowObservers = [];
+    window.__enableAllButtonsActive = false;
+  }
+
   // Report count back to background with debouncing
   function reportCount() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      chrome.runtime.sendMessage({
-        action: 'countUpdate',
-        count: totalCount
-      }).catch(() => {}); // Extension context may be invalidated
+      if (!isContextValid()) {
+        teardownOnInvalidContext();
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage({ action: 'countUpdate', count: totalCount })
+          .catch(() => {});
+      } catch {
+        teardownOnInvalidContext();
+      }
     }, 200);
   }
 
@@ -208,7 +231,7 @@ if (window.__enableAllButtonsActive) {
 
   // Listen for disconnect message from background
   chrome.runtime.onMessage.addListener((message) => {
-    if (message.action === 'disconnect') {
+    if (message.action === 'disconnect' && message.feature === 'buttons') {
       stop();
     }
   });

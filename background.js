@@ -1,24 +1,28 @@
-// background.js — Service worker managing per-tab state and content script injection
+// background.js — Service worker managing per-tab state for both features
 
-const STORAGE_KEY = 'enabledTabs';
+const STORAGE_KEY = 'tabStates';
 
-async function getEnabledTabs() {
+async function getTabStates() {
   const data = await chrome.storage.session.get(STORAGE_KEY);
   return data[STORAGE_KEY] || {};
 }
 
-async function setEnabledTabs(tabs) {
-  await chrome.storage.session.set({ [STORAGE_KEY]: tabs });
+async function setTabStates(states) {
+  await chrome.storage.session.set({ [STORAGE_KEY]: states });
 }
 
-async function injectContentScript(tabId) {
+function defaultState() {
+  return { enableButtons: false, enableDragdrop: false, count: 0 };
+}
+
+async function injectScript(tabId, file) {
   try {
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
-      files: ['content.js']
+      files: [file]
     });
   } catch (err) {
-    console.warn('Failed to inject content script:', err.message);
+    console.warn(`Failed to inject ${file}:`, err.message);
   }
 }
 
@@ -26,69 +30,97 @@ async function sendToTab(tabId, message) {
   try {
     await chrome.tabs.sendMessage(tabId, message);
   } catch {
-    // Content script may not be ready yet — ignore
+    // Content script may not be ready
   }
 }
 
-// Handle messages from popup and content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const handler = async () => {
-    const { action, tabId, count } = message;
+    const { action, feature, tabId, count } = message;
 
     if (action === 'enable') {
-      const tabs = await getEnabledTabs();
-      tabs[tabId] = { enabled: true, count: 0 };
-      await setEnabledTabs(tabs);
-      await injectContentScript(tabId);
+      const states = await getTabStates();
+      if (!states[tabId]) states[tabId] = defaultState();
+
+      if (feature === 'buttons') {
+        states[tabId].enableButtons = true;
+        states[tabId].count = 0;
+        await setTabStates(states);
+        await injectScript(tabId, 'content.js');
+      } else if (feature === 'dragdrop') {
+        states[tabId].enableDragdrop = true;
+        await setTabStates(states);
+        await injectScript(tabId, 'content-dragdrop.js');
+      }
       return { success: true };
     }
 
     if (action === 'disable') {
-      const tabs = await getEnabledTabs();
-      delete tabs[tabId];
-      await setEnabledTabs(tabs);
-      await sendToTab(tabId, { action: 'disconnect' });
+      const states = await getTabStates();
+      if (!states[tabId]) return { success: true };
+
+      if (feature === 'buttons') {
+        states[tabId].enableButtons = false;
+        states[tabId].count = 0;
+        await setTabStates(states);
+        await sendToTab(tabId, { action: 'disconnect', feature: 'buttons' });
+      } else if (feature === 'dragdrop') {
+        states[tabId].enableDragdrop = false;
+        await setTabStates(states);
+        await sendToTab(tabId, { action: 'disconnect', feature: 'dragdrop' });
+      }
+
+      // Clean up if both disabled
+      if (!states[tabId].enableButtons && !states[tabId].enableDragdrop) {
+        delete states[tabId];
+        await setTabStates(states);
+      }
       return { success: true };
     }
 
     if (action === 'getState') {
-      const tabs = await getEnabledTabs();
-      const state = tabs[tabId] || { enabled: false, count: 0 };
-      return state;
+      const states = await getTabStates();
+      return states[tabId] || defaultState();
     }
 
     if (action === 'countUpdate') {
       const senderTabId = sender.tab?.id;
       if (senderTabId == null) return;
-      const tabs = await getEnabledTabs();
-      if (tabs[senderTabId]) {
-        tabs[senderTabId].count = count;
-        await setEnabledTabs(tabs);
+      const states = await getTabStates();
+      if (states[senderTabId]) {
+        states[senderTabId].count = count;
+        await setTabStates(states);
       }
       return { count };
     }
   };
 
   handler().then(sendResponse);
-  return true; // keep message channel open for async response
+  return true;
 });
 
-// Re-inject content script when an enabled tab navigates to a new page
+// Re-inject on page navigation
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (changeInfo.status !== 'complete') return;
-  const tabs = await getEnabledTabs();
-  if (tabs[tabId]?.enabled) {
-    tabs[tabId].count = 0;
-    await setEnabledTabs(tabs);
-    await injectContentScript(tabId);
+  const states = await getTabStates();
+  const state = states[tabId];
+  if (!state) return;
+
+  if (state.enableButtons) {
+    state.count = 0;
+    await setTabStates(states);
+    await injectScript(tabId, 'content.js');
+  }
+  if (state.enableDragdrop) {
+    await injectScript(tabId, 'content-dragdrop.js');
   }
 });
 
-// Clean up state when a tab is closed
+// Clean up closed tabs
 chrome.tabs.onRemoved.addListener(async (tabId) => {
-  const tabs = await getEnabledTabs();
-  if (tabs[tabId]) {
-    delete tabs[tabId];
-    await setEnabledTabs(tabs);
+  const states = await getTabStates();
+  if (states[tabId]) {
+    delete states[tabId];
+    await setTabStates(states);
   }
 });

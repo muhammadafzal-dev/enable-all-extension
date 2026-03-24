@@ -99,5 +99,71 @@
       btn.disabled = true;
     }, 2000);
   </script>
+
+  <h2>8. Drag & Drop Blocked</h2>
+  <style>
+    .drop-zone {
+      width: 100%; height: 120px; border: 2px dashed #ccc; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      color: #999; font-size: 14px; margin: 8px 0; transition: border-color 0.2s;
+    }
+    .drop-zone.over { border-color: #4CAF50; color: #4CAF50; }
+    .drag-item {
+      display: inline-block; padding: 8px 16px; background: #e0e0e0;
+      border-radius: 6px; cursor: grab; margin: 4px;
+    }
+    .no-drag { -webkit-user-drag: none; user-select: none; }
+  </style>
+
+  <div class="row">
+    <label>draggable="false" image:</label>
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect fill='%234CAF50' width='60' height='60' rx='8'/%3E%3Ctext x='30' y='35' fill='white' text-anchor='middle' font-size='14'%3EImg%3C/text%3E%3C/svg%3E" draggable="false" alt="test">
+  </div>
+  <div class="row">
+    <label>CSS -webkit-user-drag: none:</label>
+    <span class="drag-item no-drag">Try dragging me</span>
+  </div>
+  <div class="row">
+    <label>Drop zone (blocked by JS):</label>
+  </div>
+  <div class="drop-zone" id="blocked-drop">
+    Drop files here (JS blocks drop events)
+  </div>
+  <div class="row">
+    <label>Dropped files:</label>
+    <span id="drop-result">None</span>
+  </div>
+
+  <script>
+    const blockedZone = document.getElementById('blocked-drop');
+
+    // Simulate a site that blocks drops:
+    // The key is to NOT call preventDefault on dragover — the browser only
+    // allows a drop if something calls preventDefault during dragover.
+    // The extension unblocks this by adding a capture-phase dragover listener
+    // that calls preventDefault before this handler runs.
+    blockedZone.addEventListener('dragover', (e) => {
+      // Intentionally NOT calling e.preventDefault() → browser blocks drop
+      blockedZone.classList.add('over');
+    });
+
+    blockedZone.addEventListener('dragleave', () => {
+      blockedZone.classList.remove('over');
+    });
+
+    // This drop handler only fires if dragover had preventDefault called
+    // (i.e. only when the extension is ON)
+    blockedZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      blockedZone.classList.remove('over');
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        document.getElementById('drop-result').textContent =
+          Array.from(files).map(f => f.name).join(', ');
+      } else {
+        document.getElementById('drop-result').textContent = '(no files — try dropping a file from Finder)';
+      }
+    });
+  </script>
 </body>
 </html>
