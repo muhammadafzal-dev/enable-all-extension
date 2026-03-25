@@ -1,13 +1,26 @@
 // content.js — Injected into pages to enable disabled elements in real-time
+(function () {
 
-// Guard against double injection
-if (window.__enableAllButtonsActive) {
-  // Already running — just re-scan (handles page navigation re-inject)
-  if (typeof window.__eabRescan === 'function') {
-    window.__eabRescan();
-  }
+// Symbols are not enumerable via Object.keys(window) or for..in — invisible to site scans
+const _GUARD  = Symbol.for('_cb1');
+const _RESCAN = Symbol.for('_cb2');
+
+if (window[_GUARD]) {
+  // Already running — just re-scan (handles background re-injecting on navigation)
+  if (typeof window[_RESCAN] === 'function') window[_RESCAN]();
 } else {
-  window.__enableAllButtonsActive = true;
+  window[_GUARD] = true;
+
+  // Random attribute prefix per page load — looks like data-x7f3k2a, not data-eab-*
+  // A site would have to know this random value to detect us
+  const _p = Math.random().toString(36).slice(2, 9);
+  const A = {
+    disabled: `data-${_p}a`,
+    aria:     `data-${_p}b`,
+    readonly: `data-${_p}c`,
+    pointer:  `data-${_p}d`,
+    cursor:   `data-${_p}e`,
+  };
 
   let totalCount = 0;
   let observer = null;
@@ -24,33 +37,32 @@ if (window.__enableAllButtonsActive) {
 
     if (el.hasAttribute('disabled')) {
       el.removeAttribute('disabled');
-      el.dataset.eabWasDisabled = 'true';
+      el.setAttribute(A.disabled, 'true');
       changed = true;
     }
 
     if (el.getAttribute('aria-disabled') === 'true') {
       el.setAttribute('aria-disabled', 'false');
-      el.dataset.eabWasAriaDisabled = 'true';
+      el.setAttribute(A.aria, 'true');
       changed = true;
     }
 
     if (el.hasAttribute('readonly')) {
       el.removeAttribute('readonly');
-      el.dataset.eabWasReadonly = 'true';
+      el.setAttribute(A.readonly, 'true');
       changed = true;
     }
 
     const computed = getComputedStyle(el);
     if (computed.pointerEvents === 'none') {
       el.style.pointerEvents = 'auto';
-      el.dataset.eabWasPointerEvents = 'true';
+      el.setAttribute(A.pointer, 'true');
       changed = true;
     }
 
-    // Handle cursor style that indicates disabled
     if (computed.cursor === 'not-allowed') {
       el.style.cursor = 'pointer';
-      el.dataset.eabWasCursor = 'true';
+      el.setAttribute(A.cursor, 'true');
       changed = true;
     }
 
@@ -70,14 +82,13 @@ if (window.__enableAllButtonsActive) {
     let count = 0;
     const targetRoot = root || document;
 
-    // Elements with explicit disabled/aria-disabled/readonly
     targetRoot.querySelectorAll(DISABLED_SELECTOR).forEach(el => {
       if (enableElement(el)) count++;
     });
 
-    // Elements with pointer-events: none (check interactive elements only for performance)
+    // Check interactive elements for CSS-based blocking (only if not already processed)
     targetRoot.querySelectorAll(INTERACTIVE_SELECTOR).forEach(el => {
-      if (!el.dataset.eabWasDisabled && !el.dataset.eabWasPointerEvents) {
+      if (!el.hasAttribute(A.disabled) && !el.hasAttribute(A.pointer)) {
         const computed = getComputedStyle(el);
         if (computed.pointerEvents === 'none' || computed.cursor === 'not-allowed') {
           if (enableElement(el)) count++;
@@ -90,29 +101,29 @@ if (window.__enableAllButtonsActive) {
 
   // Restore all elements to their original disabled state
   function restoreAll() {
-    document.querySelectorAll('[data-eab-was-disabled]').forEach(el => {
+    document.querySelectorAll(`[${A.disabled}]`).forEach(el => {
       el.setAttribute('disabled', '');
-      delete el.dataset.eabWasDisabled;
+      el.removeAttribute(A.disabled);
     });
 
-    document.querySelectorAll('[data-eab-was-aria-disabled]').forEach(el => {
+    document.querySelectorAll(`[${A.aria}]`).forEach(el => {
       el.setAttribute('aria-disabled', 'true');
-      delete el.dataset.eabWasAriaDisabled;
+      el.removeAttribute(A.aria);
     });
 
-    document.querySelectorAll('[data-eab-was-readonly]').forEach(el => {
+    document.querySelectorAll(`[${A.readonly}]`).forEach(el => {
       el.setAttribute('readonly', '');
-      delete el.dataset.eabWasReadonly;
+      el.removeAttribute(A.readonly);
     });
 
-    document.querySelectorAll('[data-eab-was-pointer-events]').forEach(el => {
+    document.querySelectorAll(`[${A.pointer}]`).forEach(el => {
       el.style.pointerEvents = 'none';
-      delete el.dataset.eabWasPointerEvents;
+      el.removeAttribute(A.pointer);
     });
 
-    document.querySelectorAll('[data-eab-was-cursor]').forEach(el => {
+    document.querySelectorAll(`[${A.cursor}]`).forEach(el => {
       el.style.cursor = 'not-allowed';
-      delete el.dataset.eabWasCursor;
+      el.removeAttribute(A.cursor);
     });
   }
 
@@ -130,7 +141,7 @@ if (window.__enableAllButtonsActive) {
     if (observer) { observer.disconnect(); observer = null; }
     shadowObservers.forEach(obs => obs.disconnect());
     shadowObservers = [];
-    window.__enableAllButtonsActive = false;
+    window[_GUARD] = false;
   }
 
   // Report count back to background with debouncing
@@ -159,22 +170,18 @@ if (window.__enableAllButtonsActive) {
         for (const node of mutation.addedNodes) {
           if (node.nodeType !== Node.ELEMENT_NODE) continue;
           if (enableElement(node)) newCount++;
-          // Also check descendants
-          const descendants = node.querySelectorAll?.(DISABLED_SELECTOR);
-          if (descendants) {
-            descendants.forEach(el => {
-              if (enableElement(el)) newCount++;
-            });
-          }
+          node.querySelectorAll?.(DISABLED_SELECTOR).forEach(el => {
+            if (enableElement(el)) newCount++;
+          });
         }
       }
 
       if (mutation.type === 'attributes') {
         const el = mutation.target;
-        // Skip if we already processed this element (avoid loops)
-        if (mutation.attributeName === 'disabled' && el.dataset.eabWasDisabled) continue;
-        if (mutation.attributeName === 'aria-disabled' && el.dataset.eabWasAriaDisabled) continue;
-        if (mutation.attributeName === 'readonly' && el.dataset.eabWasReadonly) continue;
+        // Skip attributes we set ourselves to avoid infinite loops
+        if (mutation.attributeName === 'disabled'      && el.hasAttribute(A.disabled)) continue;
+        if (mutation.attributeName === 'aria-disabled' && el.hasAttribute(A.aria))     continue;
+        if (mutation.attributeName === 'readonly'      && el.hasAttribute(A.readonly)) continue;
         if (enableElement(el)) newCount++;
       }
     }
@@ -185,22 +192,19 @@ if (window.__enableAllButtonsActive) {
     }
   }
 
-  // Observer config
   const observerConfig = {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ['disabled', 'aria-disabled', 'readonly', 'style']
+    attributeFilter: ['disabled', 'aria-disabled', 'readonly', 'style'],
   };
 
-  // Attach observer to a shadow root
   function attachShadowObserver(shadowRoot) {
     const shadowObs = new MutationObserver(handleMutations);
     shadowObs.observe(shadowRoot, observerConfig);
     shadowObservers.push(shadowObs);
   }
 
-  // Start observing and enable all existing elements
   function start() {
     totalCount = scanAndEnable();
     reportCount();
@@ -209,33 +213,25 @@ if (window.__enableAllButtonsActive) {
     observer.observe(document.documentElement, observerConfig);
   }
 
-  // Stop observing and restore elements
   function stop() {
-    if (observer) {
-      observer.disconnect();
-      observer = null;
-    }
+    if (observer) { observer.disconnect(); observer = null; }
     shadowObservers.forEach(obs => obs.disconnect());
     shadowObservers = [];
-
     restoreAll();
     totalCount = 0;
-    window.__enableAllButtonsActive = false;
+    window[_GUARD] = false;
   }
 
-  // Expose rescan for re-injection
-  window.__eabRescan = () => {
+  // Expose rescan via Symbol — invisible to site scans
+  window[_RESCAN] = () => {
     totalCount += scanAndEnable();
     reportCount();
   };
 
-  // Listen for disconnect message from background
   chrome.runtime.onMessage.addListener((message) => {
-    if (message.action === 'disconnect' && message.feature === 'buttons') {
-      stop();
-    }
+    if (message.action === 'disconnect' && message.feature === 'buttons') stop();
   });
 
-  // Start immediately
   start();
 }
+})();
