@@ -75,11 +75,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         states[tabId].enableButtons = true;
         states[tabId].count = 0;
         await setTabStates(states);
-        await injectScript(tabId, 'content.js');
+        await injectScript(tabId, 'content/buttons.js');
       } else if (feature === 'dragdrop') {
         states[tabId].enableDragdrop = true;
         await setTabStates(states);
-        await injectScript(tabId, 'content-dragdrop.js');
+        await injectScript(tabId, 'content/dragdrop.js');
       } else if (feature === 'modeloverride') {
         const target = model || states[tabId].modelOverrideTarget || 'gpt-5-3';
         states[tabId].enableModelOverride = true;
@@ -87,7 +87,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         await setTabStates(states);
         // Set window.__eabTargetModel BEFORE injecting so script initialises with correct model
         await setModelInTab(tabId, target);
-        await injectMainWorld(tabId, 'content-model-override-main.js');
+        await injectMainWorld(tabId, 'content/model-override-main.js');
       }
       return { success: true };
     }
@@ -108,7 +108,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else if (feature === 'modeloverride') {
         states[tabId].enableModelOverride = false;
         await setTabStates(states);
-        await injectMainWorld(tabId, 'content-model-override-stop.js');
+        await injectMainWorld(tabId, 'content/model-override-stop.js');
       }
 
       // Clean up if all disabled
@@ -160,14 +160,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (state.enableButtons) {
     state.count = 0;
     await setTabStates(states);
-    await injectScript(tabId, 'content.js');
+    await injectScript(tabId, 'content/buttons.js');
   }
   if (state.enableDragdrop) {
-    await injectScript(tabId, 'content-dragdrop.js');
+    await injectScript(tabId, 'content/dragdrop.js');
   }
   if (state.enableModelOverride) {
     await setModelInTab(tabId, state.modelOverrideTarget || 'gpt-5-3');
-    await injectMainWorld(tabId, 'content-model-override-main.js');
+    await injectMainWorld(tabId, 'content/model-override-main.js');
   }
 });
 
