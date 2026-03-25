@@ -40,6 +40,49 @@
         </label>
       </div>
 
+      <!-- Model Override Card -->
+      <div class="card" id="card-modeloverride">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 10h6M10 7l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="card-content">
+          <div class="card-title">Model Override</div>
+          <div class="card-desc" id="status-modeloverride">Override model on all API requests</div>
+          <select id="select-modeloverride" class="model-select">
+            <optgroup label="GPT-5">
+              <option value="gpt-5-3">gpt-5-3</option>
+              <option value="gpt-5-4-pro">gpt-5-4-pro</option>
+              <option value="gpt-5-2">gpt-5-2</option>
+              <option value="gpt-5-1">gpt-5-1</option>
+              <option value="gpt-5">gpt-5</option>
+              <option value="gpt-5-mini">gpt-5-mini</option>
+              <option value="gpt-5-t-mini">gpt-5-t-mini</option>
+              <option value="gpt-5-4-t-mini">gpt-5-4-t-mini</option>
+            </optgroup>
+            <optgroup label="GPT-4">
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-4o-mini">gpt-4o-mini</option>
+              <option value="gpt-4-turbo">gpt-4-turbo</option>
+              <option value="gpt-4">gpt-4</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option value="o1">o1</option>
+              <option value="o1-mini">o1-mini</option>
+              <option value="o3-mini">o3-mini</option>
+              <option value="research">research</option>
+              <option value="auto">auto</option>
+            </optgroup>
+          </select>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-modeloverride">
+          <span class="slider"></span>
+        </label>
+      </div>
+
       <!-- Enable Drag & Drop Card -->
       <div class="card" id="card-dragdrop">
         <div class="card-icon">
